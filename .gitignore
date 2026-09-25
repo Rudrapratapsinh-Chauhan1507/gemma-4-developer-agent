@@ -6,3 +6,6 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
+
+kaggle_resources/
+local_eval/
