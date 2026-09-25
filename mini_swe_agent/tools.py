@@ -266,6 +266,26 @@ class ToolRegistry:
             )
         return "\n".join(lines)
 
+    def analyze_failure(self, command: str, return_code: int, stdout: str, stderr: str) -> str:
+        """
+        Analyze a failed command execution and return a structured diagnostic summary.
+
+        Useful for Stage 4 components to understand failures without manually
+        parsing tracebacks.
+        """
+        from .execution import CommandResult
+        from .failure_analysis import FailureAnalyzer
+
+        result = CommandResult(
+            command=command,
+            return_code=return_code,
+            stdout=stdout,
+            stderr=stderr
+        )
+        analyzer = FailureAnalyzer(self)
+        analysis = analyzer.analyze(result)
+        return analysis.to_display_string()
+
     def get_code_neighbors(self, node_id: str, direction: str = "both") -> str:
         """
         Return the immediate graph neighbors of a code node.
@@ -380,6 +400,12 @@ class ToolRegistry:
                 a.get("timeout_seconds", 30),
             ),
             "get_patch": lambda a: self.get_patch(),
+            "analyze_failure": lambda a: self.analyze_failure(
+                a.get("command", ""),
+                a.get("return_code", 1),
+                a.get("stdout", ""),
+                a.get("stderr", ""),
+            ),
         }
 
         if tool_name not in tool_map:
