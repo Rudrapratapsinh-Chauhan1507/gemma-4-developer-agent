@@ -1,4 +1,4 @@
-# Stage 1: Mini SWE Agent Architecture
+# Agent Architecture
 
 ## 1. System Philosophy: Closed-Loop ReAct
 
@@ -40,7 +40,35 @@ In contrast, an autonomous Software Engineering Agent operates in a **closed-loo
 
 ---
 
-## 2. Component Breakdown
+## 2. Stage 2: Repository-Aware Retrieval Pipeline
+
+Before the ReAct loop starts, the agent uses an **additive** semantic retrieval pipeline to ground its initial context. (If retrieval is disabled, the Stage 1 behavior remains fully intact).
+
+```
+Issue Description
+       ↓
+[ Repository Discovery ]      (Filters out binaries, .git, pycache)
+       ↓
+[ Code Chunking ]             (AST parses classes/functions, with line-window fallback)
+       ↓
+[ Embedding ]                 (sentence-transformers: all-MiniLM-L6-v2)
+       ↓
+[ FAISS Vector Index ]        (IndexFlatIP for fast cosine similarity)
+       ↓
+[ Semantic Retrieval ]        (Retrieves top-K nearest code chunks)
+       ↓
+[ Context Builder ]           (Formats into a budget-constrained markdown context)
+       ↓
+MiniSWEAgent                  (Initial prompt injected with repository context)
+       ↓
+ReAct Loop
+```
+
+**Keyword Baseline**: A `KeywordRetriever` token-matching baseline is also implemented to benchmark and evaluate the semantic system.
+
+---
+
+## 3. Core Component Breakdown
 
 ### A. Sandboxed Workspace (`sandbox/mini_shop/`)
 A realistic Python repository with unit tests (`unittest`), business logic, and intentional bugs:
@@ -50,30 +78,20 @@ A realistic Python repository with unit tests (`unittest`), business logic, and 
 
 ### B. Tool Registry (`mini_swe_agent/tools.py`)
 Encapsulates all filesystem and execution interactions with strict security and portability boundaries:
-1. `list_files(directory=".")`: Recursively lists repository files, filtering `.git`, `__pycache__`, and virtual environments.
-2. `read_file(path, start_line=1, end_line=None)`: Displays line-numbered code slices for targeted inspection.
-3. `search_code(query, directory=".")`: Substring search across all text files with file and line locations.
-4. `edit_file(path, target_string, replacement_string)`:
-   * Normalizes CRLF / LF line endings to avoid cross-platform whitespace mismatch.
-   * Guarantees single-occurrence replacement; rejects ambiguous matches.
-5. `run_command(command)`: Executes shell commands inside the workspace with timeout safeguards, capturing exit code, stdout, and stderr.
-6. `get_patch()`: Extracts the unified git diff (`git diff HEAD`).
+1. `list_files(directory=".")`: Recursively lists repository files.
+2. `read_file(path, start_line=1, end_line=None)`: Displays line-numbered code slices.
+3. `search_code(query, directory=".")`: Substring search across all text files.
+4. `search_similar_code(query, k=5)`: Semantic retrieval exposed as a tool for the agent during the ReAct loop.
+5. `edit_file(path, target_string, replacement_string)`: Normalizes CRLF / LF line endings and guarantees single-occurrence safe replacement.
+6. `run_command(command)`: Executes shell commands inside the workspace with timeouts.
+7. `get_patch()`: Extracts the unified git diff scoped to the workspace.
 
 ### C. LLM Reasoning Layer (`mini_swe_agent/llm.py`)
 Decoupled through the `BaseLLMClient` interface:
-* `DeterministicSWEClient`: Phase-driven state machine (Reproduce -> Inspect -> Fix -> Verify -> Conclude). Enables 100% offline, repeatable CI testing.
-* `OllamaClient`: Direct HTTP integration with local Ollama models (e.g. `llama3.2:3b` or local Gemma).
-* `GeminiClient`: Direct integration with Google Gemini models using `google.genai`.
+* `DeterministicSWEClient`: Phase-driven state machine enabling 100% offline, repeatable CI testing.
+* `OllamaClient`: HTTP integration with local Ollama models.
+* `GeminiClient`: Integration with Google Gemini models.
 
 ### D. Agent Controller (`mini_swe_agent/agent.py`)
 * Coordinates step iteration, conversation history, and tool execution.
-* Enforces max-step limits (guardrails against runaway loops).
 * Records full trajectory (`AgentStep`) for post-mortem analysis and benchmarking.
-
----
-
-## 3. Resolving Real Failures: Lessons Learned
-
-During Stage 1 development, two real-world cross-platform challenges were identified and solved:
-1. **CRLF vs LF Line Endings**: Windows file writes often introduce `\r\n`, whereas string literals in code use `\n`. The `edit_file` tool was updated to normalize line endings during matching while preserving the file's original format.
-2. **Terminal Encoding (CP1252 vs UTF-8)**: Raw Unicode emoji characters can cause `UnicodeEncodeError` in standard Windows cmd/PowerShell terminals. The agent logger was equipped with universal ASCII tags (`[START]`, `[THOUGHT]`, `[ACTION]`, `[OBSERVATION]`, `[SUCCESS]`) and a graceful fallback.

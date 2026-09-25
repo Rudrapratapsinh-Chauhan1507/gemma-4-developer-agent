@@ -97,7 +97,7 @@ In Google's **Gemma 4 Developer Agent Competition** on Kaggle, the goal is to bu
 |---|---|---|
 | **Stage 0** | **Orientation & Roadmap** | Inspect official requirements, map architecture, setup repo, define testbench strategy. |
 | **Stage 1** | **Minimal Local SWE Agent** | Build a minimal local ReAct agent: receives an issue, reads files, reasons, edits code, runs tests, fixes failures, produces a git patch. |
-| **Stage 2** | **Repository Navigation & Semantic Retrieval** | Implement offline semantic search tool (`search_similar_code`) using NumPy cosine similarity and symbol metadata. |
+| **Stage 2** | **Repository Navigation & Semantic Retrieval** | ✅ **Complete** — Implemented repository discovery, keyword baseline, AST code chunking, `all-MiniLM-L6-v2` embeddings, FAISS semantic retrieval, ContextBuilder, and `search_similar_code` agent integration. |
 | **Stage 3** | **Code-Relationship & Graph Retrieval** | Implement graph-aware tools (`get_code_neighbors`, `get_code_subgraph`) using NetworkX AST call/dependency graphs. |
 | **Stage 4** | **Test-Driven Self-Debugging** | Implement automated failure reflection, traceback parsing, regression guardrails, and budget awareness via `get_status`. |
 | **Stage 5** | **Kaggle Harness Compatibility** | Adapt the agent runtime to match exact competition harness interfaces, argument schemas, and tool specifications. |
@@ -107,14 +107,32 @@ In Google's **Gemma 4 Developer Agent Competition** on Kaggle, the goal is to bu
 
 ---
 
+### Stage 2 Verification
+
+Stage 2 has been completed and locally verified.
+
+- **59/59 tests passing**
+  - 8 Stage 1 tests
+  - 51 Stage 2 retrieval tests
+- Stage 2 semantic retrieval demo completed successfully.
+- Stage 2 keyword-vs-semantic evaluation completed successfully.
+- On the two-issue `sandbox/mini_shop` evaluation:
+  - Both approaches retrieved the relevant target within top-5.
+  - Semantic retrieval ranked the relevant code component #1 for both issues.
+  - Keyword retrieval ranked `ISSUES.md` #1 for both issues due to lexical overlap.
+
+**Next:** Stage 3 — Code-Relationship & Graph Retrieval.
+
+---
+
 ## 4. Technology Choices
 
 * **Primary Language**: Python 3.12 (clean, modular, standard library oriented).
 * **Graph Handling**: `networkx` (built-in support for serialized JSON AST graphs).
-* **Vector Retrieval**: `numpy` (fast cosine similarity over pre-computed `.npz` / `.npy` embeddings, zero heavy dependencies).
+* **Vector Retrieval**: `faiss-cpu` with normalized `sentence-transformers` embeddings (`all-MiniLM-L6-v2`) for local semantic code retrieval.
 * **Configuration**: `pyyaml` (for parsing and generating `agent.yaml` and `sampling.yaml`).
 * **Tool & Process Execution**: Python `subprocess` with timeout and stdout/stderr capture (mirrors Kaggle's `/bin/bash -c`).
-* **Testing Framework**: `pytest` for unit testing our tools, agent state machine, and mock harness.
+* **Testing Framework**: Python `unittest` for the current Stage 1/Stage 2 test suites.
 * **No PyTorch or Heavy Frameworks Needed initially**: Keeps development fast, debuggable, transparent, and completely lightweight.
 
 ---

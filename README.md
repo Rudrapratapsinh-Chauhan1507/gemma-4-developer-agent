@@ -7,8 +7,8 @@ An autonomous software engineering agent built for Google's Kaggle **Gemma 4 Dev
 ## Project Status
 
 * **Project**: Gemma 4 Developer Agent
-* **Current Status**: **Stage 1 — Tool-based Mini SWE Agent completed**
-* **Next**: **Stage 2 — Repository-aware semantic code retrieval**
+* **Current Status**: **Stage 2 — Repository-aware semantic code retrieval completed**
+* **Next**: **Stage 3 — (See ROADMAP.md)**
 
 ---
 
@@ -20,34 +20,52 @@ An autonomous software engineering agent built for Google's Kaggle **Gemma 4 Dev
 
 ---
 
-## Stage 1 Completed Capabilities
+## Capabilities Overview
 
-We have built and verified a lightweight, zero-dependency local SWE Agent:
-* **Sandbox Repository** (`sandbox/mini_shop`): An e-commerce package with intentional bugs and `unittest` test suites.
-* **Core Tool Suite** (`mini_swe_agent/tools.py`): Sandboxed implementations of `list_files`, `read_file`, `search_code`, `edit_file`, and `run_command`.
-* **Agent Controller** (`mini_swe_agent/agent.py`): ReAct execution loop (Plan $\rightarrow$ Act $\rightarrow$ Observe $\rightarrow$ Reflect) with trajectory logging and step budget limits.
-* **Pluggable LLM Interface** (`mini_swe_agent/llm.py`): Supports `DeterministicSWEClient` (for repeatable offline CI testing), local `OllamaClient`, and `GeminiClient`.
+### Stage 1: Core Agent
+* **Sandbox Repository** (`sandbox/mini_shop`): An e-commerce package with intentional bugs and test suites.
+* **Core Tool Suite**: Sandboxed implementations of `list_files`, `read_file`, `search_code`, `edit_file`, and `run_command`.
+* **Agent Controller**: ReAct execution loop (Plan $\rightarrow$ Act $\rightarrow$ Observe $\rightarrow$ Reflect).
+* **Pluggable LLM Interface**: Supports `DeterministicSWEClient`, local `OllamaClient`, and `GeminiClient`.
+
+### Stage 2: Repository-Aware Retrieval
+* **File Discovery**: Filters out binary, generated, and ignored directories (e.g. `.git`, `__pycache__`).
+* **Code Chunking**: AST-based chunking that safely extracts classes, functions, and methods, falling back to line-windows for unstructured or broken code.
+* **Semantic Embeddings**: Uses `sentence-transformers` (`all-MiniLM-L6-v2`) to embed chunks locally.
+* **FAISS Vector Index**: Fast and exact cosine-similarity (`IndexFlatIP`) nearest-neighbor search.
+* **Baseline Keyword Retrieval**: Token-matching fallback baseline.
+* **Context Builder**: Formats retrieved chunks neatly while respecting character and token budgets, injecting context prior to the first ReAct loop.
 
 ---
 
-## How to Run the Tests & Demo
+## How to Run the Tests & Demos
 
 ### 1. Run All Tests
 ```powershell
 python -m unittest discover -s tests
 ```
-Runs 8 tests in < 2 seconds:
-- 6 unit tests for ToolRegistry
-- 2 end-to-end integration tests solving Bug #1 and Bug #2 autonomously
+Runs 59 passing tests, validating both the Stage 1 Core Agent and all Stage 2 Semantic Retrieval modules.
 
-### 2. Run the Interactive Demo
+### 2. Run the Stage 1 Demo
 ```powershell
 python run_demo.py
 ```
-Demonstrates the agent receiving the issue descriptions, running tests to observe tracebacks, inspecting code, modifying the source files, verifying passing tests, and generating the fix.
+Demonstrates the agent solving bugs autonomously using standard tools.
+
+### 3. Run the Stage 2 Semantic Retrieval Demo
+```powershell
+python run_demo_stage2.py
+```
+Demonstrates the semantic search pipeline on the "discount percentage calculation" bug, showing indexing, keyword ranking, semantic ranking, and the resulting ContextBuilder block.
+
+### 4. Run the Stage 2 Local Evaluation
+```powershell
+python run_evaluation_stage2.py
+```
+On the two-issue local sandbox evaluation, both approaches retrieved the relevant target within top-5; semantic retrieval ranked the relevant code component #1 in both cases, while keyword retrieval ranked ISSUES.md #1.
 
 ---
 
 ## Documentation Links
 * [ROADMAP.md](ROADMAP.md) - Master project roadmap and Kaggle competition strategy.
-* [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed breakdown of the Stage 1 agent architecture.
+* [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed breakdown of the agent architecture and retrieval pipeline.

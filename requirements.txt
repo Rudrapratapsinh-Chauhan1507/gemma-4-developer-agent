@@ -1,0 +1,7 @@
+# LLM Clients
+google-genai
+
+# Stage 2: Semantic Retrieval
+sentence-transformers
+faiss-cpu
+numpy

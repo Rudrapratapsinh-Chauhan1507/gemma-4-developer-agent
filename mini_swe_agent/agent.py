@@ -43,13 +43,22 @@ class MiniSWEAgent:
         system_prompt: str = SYSTEM_PROMPT,
         max_steps: int = 10,
         verbose: bool = True,
+        retriever: Optional[Any] = None,
+        enable_retrieval: bool = False,
     ):
         self.workspace_dir = workspace_dir
-        self.tools = ToolRegistry(workspace_dir)
+        self.retriever = retriever
+        self.tools = ToolRegistry(workspace_dir, retriever=retriever)
         self.llm = llm_client or DeterministicSWEClient()
         self.system_prompt = system_prompt
         self.max_steps = max_steps
         self.verbose = verbose
+        self.enable_retrieval = enable_retrieval or (retriever is not None)
+        if self.enable_retrieval:
+            from .retrieval.context_builder import ContextBuilder
+            self.context_builder = ContextBuilder()
+        else:
+            self.context_builder = None
 
     def log(self, message: str) -> None:
         if self.verbose:
@@ -66,8 +75,21 @@ class MiniSWEAgent:
         self.log(f"Issue: {issue_description.strip()}")
         self.log("=" * 60 + "\n")
 
+        initial_prompt = issue_description.strip()
+        if self.enable_retrieval and self.retriever:
+            self.log("[RETRIEVAL] Running semantic repository code search...")
+            try:
+                retrieval_results = self.retriever.retrieve(issue_description, top_k=3)
+                if self.context_builder:
+                    context_block = self.context_builder.build_context(retrieval_results)
+                    if context_block:
+                        self.log(f"[RETRIEVAL] Found {len(retrieval_results)} relevant code chunk(s). Injecting context.\n")
+                        initial_prompt = f"{issue_description.strip()}\n\n{context_block}"
+            except Exception as e:
+                self.log(f"[RETRIEVAL] Notice: retrieval step failed ({e}), proceeding with standard ReAct loop.")
+
         messages: List[Dict[str, str]] = [
-            {"role": "user", "content": issue_description}
+            {"role": "user", "content": initial_prompt}
         ]
         steps_record: List[AgentStep] = []
 

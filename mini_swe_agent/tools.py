@@ -17,10 +17,11 @@ from typing import Dict, Any, List, Optional
 class ToolRegistry:
     """Manages execution of sandboxed developer tools within a workspace."""
 
-    def __init__(self, workspace_dir: str):
+    def __init__(self, workspace_dir: str, retriever: Optional[Any] = None):
         self.workspace_dir = Path(workspace_dir).resolve()
         if not self.workspace_dir.exists():
             raise FileNotFoundError(f"Workspace directory does not exist: {self.workspace_dir}")
+        self.retriever = retriever
 
     def _resolve_path(self, relative_path: str) -> Path:
         """Resolve a relative path inside the workspace and ensure it cannot escape."""
@@ -198,13 +199,30 @@ class ToolRegistry:
         Return the git diff of changes made in the workspace.
         """
         diff_res = subprocess.run(
-            "git diff HEAD",
+            f'git diff HEAD -- "{self.workspace_dir}"',
             cwd=str(self.workspace_dir),
             shell=True,
             capture_output=True,
             text=True,
         )
         return diff_res.stdout
+
+    def search_similar_code(self, query: str, k: int = 5) -> str:
+        """
+        Semantic code retrieval across indexed repository components.
+        """
+        if self.retriever is None:
+            return "Semantic retriever is not configured for this workspace."
+        results = self.retriever.retrieve(query, top_k=k)
+        if not results:
+            return f"No semantically similar code found for '{query}'."
+        lines = [f"Found {len(results)} semantically similar code components:"]
+        for idx, r in enumerate(results, 1):
+            lines.append(
+                f"{idx}. {r['file_path']} -> {r['symbol_type']} `{r['symbol_name']}` "
+                f"(lines {r['start_line']}-{r['end_line']}, similarity: {r['score']:.2f})"
+            )
+        return "\n".join(lines)
 
     def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
         """Dispatch a tool call by name with arguments."""
@@ -218,6 +236,10 @@ class ToolRegistry:
             "search_code": lambda a: self.search_code(
                 a.get("query", ""),
                 a.get("directory", "."),
+            ),
+            "search_similar_code": lambda a: self.search_similar_code(
+                a.get("query", ""),
+                a.get("k", 5),
             ),
             "edit_file": lambda a: self.edit_file(
                 a.get("path", ""),
