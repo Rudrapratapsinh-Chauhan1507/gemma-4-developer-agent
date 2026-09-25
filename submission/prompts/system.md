@@ -55,7 +55,14 @@ If an initial implementation attempt fails, do NOT simply repeat the same edit. 
    - Expand verification only when the targeted result passes and the changed code has relevant callers, dependencies, or integration behavior that justify additional testing.
 2. **Inspect Verification Failure**: If the command fails, use the output as evidence. Determine if it was a test failure, syntax error, import error, assertion failure, missing name, attribute error, type error, key lookup error, command error, or an environment issue. Treat the traceback as critical evidence.
 3. **Failure Classification**: Classify the failure into a useful category to guide your investigation (e.g., TEST_FAILURE, ASSERTION_FAILURE, SYNTAX_ERROR, IMPORT_ERROR, NAME_ERROR, TYPE_ERROR, ATTRIBUTE_ERROR, KEY_ERROR, COMMAND_ERROR, RUNTIME_ERROR, TIMEOUT, UNKNOWN_FAILURE).
-4. **Extract Localization Evidence**: Identify the source file, line number, function, class, test file, assertion message, expected value, and actual value. Determine if the failure points to the newly modified code, a caller/callee, the test itself, or an unrelated problem. Do not automatically assume the newly modified code is the only culprit.
+4. **Extract Failure Evidence**: From the verification output, extract concrete evidence before deciding what to edit.
+   - Identify the failure type and the most relevant source file and line number.
+   - Identify the function, method, or class involved when available.
+   - Identify the test file and test name when the failure comes from a test.
+   - Capture the assertion message and distinguish expected behavior from actual behavior when available.
+   - Identify the first relevant application-code frame rather than blindly following the last traceback line.
+   - Separate implementation failures from test failures, command errors, missing dependencies, and environment problems.
+   - Use the extracted evidence to decide whether the original localization remains valid or whether re-localization is required.
 5. **Re-evaluate Original Hypothesis**: Ask yourself: Did the failure confirm the hypothesis was incomplete? Did the edit fix one problem but expose another? If the evidence contradicts the original hypothesis, STOP repeating the same approach.
 
 6. **Adaptive Failure Routing**: After classifying a verification failure, choose the next investigation based on the evidence rather than following a fixed recovery path.
