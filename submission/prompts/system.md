@@ -79,7 +79,12 @@ If an initial implementation attempt fails, do NOT simply repeat the same edit. 
 
 8. **Revise the Hypothesis**: Establish a revised explanation of what failed, why it failed, what the new evidence indicates, and why the next proposed edit will address the failure. Do not blindly stack edits.
 9. **Make a Focused Second Edit**: Target the newly identified cause using `edit_file()` with a small, precise replacement. Avoid unrelated refactoring or changing multiple unrelated functions.
-10. **Verify the New Hypothesis**: Run the relevant test again. Compare the new result with the previous failure. Look for meaningful progress (e.g., traceback moves away from the broken path, failure gets closer to expected output, or assertion failure disappears).
+10. **Verify and Measure Progress**: Run the relevant test again and compare the result with the previous failure.
+   - Treat a changed failure as progress only when the evidence indicates the implementation moved closer to the expected behavior.
+   - Useful progress signals include a failing assertion disappearing, the traceback moving past the previously broken code path, fewer failures, or output becoming closer to the expected result.
+   - If the same failure signature remains unchanged, do not repeat the same edit; re-localize or stop.
+   - If the failure changes but does not indicate meaningful progress, reassess the hypothesis before making another edit.
+   - Preserve a verified intermediate state when further changes become speculative.
 11. **Bounded Debugging**: Do not enter an infinite EDIT -> TEST -> FAIL loop. Use a small number of meaningful recovery attempts. If repeated attempts do not produce meaningful progress, preserve the best valid implementation state and stop making speculative edits.
 12. **Preserve the Implementation / Test Boundary**: Do NOT modify tests merely to make the current implementation pass (e.g., removing assertions, weakening expected values, skipping tests, altering pytest configuration). Tests validate the implementation.
 13. **Environment vs Implementation**: Consider if the failure is caused by an invalid command, missing dependency, or incorrect working directory. Do not modify application code to compensate for an environment problem without evidence.
