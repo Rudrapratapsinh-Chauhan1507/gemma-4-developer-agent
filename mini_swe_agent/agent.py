@@ -161,41 +161,45 @@ class MiniSWEAgent:
                     self.debug_attempts = 0
                     self.last_failure_sig = None
                 else:
-                    self.debug_attempts += 1
-
-                    from .failure_analysis import FailureAnalyzer
-                    analyzer = FailureAnalyzer(self.tools)
-                    analysis = analyzer.analyze(cmd_result)
-
-                    failure_sig = f"{analysis.failure_type}::{analysis.summary}"
-
-                    if self.debug_attempts > self.max_debug_attempts:
-                        self.log(f"[DEBUG ABORT] Maximum debug attempts ({self.max_debug_attempts}) reached.")
-                        return AgentResult(
-                            success=False,
-                            summary=f"Failed after {self.max_debug_attempts} debug attempts. Final error: {analysis.summary}",
-                            patch=self.tools.get_patch(),
-                            total_steps=step_idx,
-                            steps=steps_record,
-                        )
-                    elif failure_sig == getattr(self, 'last_failure_sig', None):
-                        self.log("[DEBUG ABORT] Repeated identical failure detected.")
-                        return AgentResult(
-                            success=False,
-                            summary=f"Aborted due to repeated identical failure: {analysis.summary}",
-                            patch=self.tools.get_patch(),
-                            total_steps=step_idx,
-                            steps=steps_record,
-                        )
+                    if self.max_debug_attempts == 0:
+                        # Backward compatibility for baseline mode (no debugging)
+                        observation = cmd_result.to_display_string()
                     else:
-                        self.last_failure_sig = failure_sig
-                        diagnostic_ctx = analysis.to_display_string()
-                        observation = (
-                            cmd_result.to_display_string() +
-                            f"\n\n--- DIAGNOSTIC CONTEXT (Attempt {self.debug_attempts}/{self.max_debug_attempts}) ---\n" +
-                            diagnostic_ctx +
-                            "\n\nPlease analyze this failure, correct the code, and run the command again."
-                        )
+                        self.debug_attempts += 1
+
+                        from .failure_analysis import FailureAnalyzer
+                        analyzer = FailureAnalyzer(self.tools)
+                        analysis = analyzer.analyze(cmd_result)
+
+                        failure_sig = f"{analysis.failure_type}::{analysis.summary}"
+
+                        if self.debug_attempts > self.max_debug_attempts:
+                            self.log(f"[DEBUG ABORT] Maximum debug attempts ({self.max_debug_attempts}) reached.")
+                            return AgentResult(
+                                success=False,
+                                summary=f"Failed after {self.max_debug_attempts} debug attempts. Final error: {analysis.summary}",
+                                patch=self.tools.get_patch(),
+                                total_steps=step_idx,
+                                steps=steps_record,
+                            )
+                        elif failure_sig == getattr(self, 'last_failure_sig', None):
+                            self.log("[DEBUG ABORT] Repeated identical failure detected.")
+                            return AgentResult(
+                                success=False,
+                                summary=f"Aborted due to repeated identical failure: {analysis.summary}",
+                                patch=self.tools.get_patch(),
+                                total_steps=step_idx,
+                                steps=steps_record,
+                            )
+                        else:
+                            self.last_failure_sig = failure_sig
+                            diagnostic_ctx = analysis.to_display_string()
+                            observation = (
+                                cmd_result.to_display_string() +
+                                f"\n\n--- DIAGNOSTIC CONTEXT (Attempt {self.debug_attempts}/{self.max_debug_attempts}) ---\n" +
+                                diagnostic_ctx +
+                                "\n\nPlease analyze this failure, correct the code, and run the command again."
+                            )
             else:
                 observation = self.tools.execute(tool_name, tool_args)
 
