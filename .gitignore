@@ -9,3 +9,6 @@ venv/
 
 kaggle_resources/
 local_eval/
+
+# Generated Kaggle submission package
+submission.zip
