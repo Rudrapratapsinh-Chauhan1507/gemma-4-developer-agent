@@ -28,7 +28,7 @@ class AgentResult:
 class MiniSWEAgent:
     """
     Autonomous ReAct Software Engineering Agent.
-    
+
     Executes the loop:
     1. Plan / Reason over current issue & previous observations
     2. Act by selecting a tool and arguments
@@ -46,11 +46,15 @@ class MiniSWEAgent:
         retriever: Optional[Any] = None,
         enable_retrieval: bool = False,
         enable_graph: bool = False,
+        max_debug_attempts: int = 3,
     ):
         self.workspace_dir = workspace_dir
         self.retriever = retriever
         self.enable_retrieval = enable_retrieval or (retriever is not None)
         self.enable_graph = enable_graph
+        self.max_debug_attempts = max_debug_attempts
+        self.debug_attempts = 0
+        self.last_failure_sig = None
 
         # Lazy graph construction: only build when enable_graph=True
         code_graph = None
@@ -147,7 +151,54 @@ class MiniSWEAgent:
                 )
 
             # 3. Execute tool action in workspace
-            observation = self.tools.execute(tool_name, tool_args)
+            if tool_name == "run_command":
+                cmd = tool_args.get("command", "")
+                timeout = tool_args.get("timeout_seconds", 30)
+                cmd_result = self.tools.run_command_structured(cmd, timeout)
+
+                if cmd_result.success:
+                    observation = cmd_result.to_display_string()
+                    self.debug_attempts = 0
+                    self.last_failure_sig = None
+                else:
+                    self.debug_attempts += 1
+
+                    from .failure_analysis import FailureAnalyzer
+                    analyzer = FailureAnalyzer(self.tools)
+                    analysis = analyzer.analyze(cmd_result)
+
+                    failure_sig = f"{analysis.failure_type}::{analysis.summary}"
+
+                    if self.debug_attempts > self.max_debug_attempts:
+                        self.log(f"[DEBUG ABORT] Maximum debug attempts ({self.max_debug_attempts}) reached.")
+                        return AgentResult(
+                            success=False,
+                            summary=f"Failed after {self.max_debug_attempts} debug attempts. Final error: {analysis.summary}",
+                            patch=self.tools.get_patch(),
+                            total_steps=step_idx,
+                            steps=steps_record,
+                        )
+                    elif failure_sig == getattr(self, 'last_failure_sig', None):
+                        self.log("[DEBUG ABORT] Repeated identical failure detected.")
+                        return AgentResult(
+                            success=False,
+                            summary=f"Aborted due to repeated identical failure: {analysis.summary}",
+                            patch=self.tools.get_patch(),
+                            total_steps=step_idx,
+                            steps=steps_record,
+                        )
+                    else:
+                        self.last_failure_sig = failure_sig
+                        diagnostic_ctx = analysis.to_display_string()
+                        observation = (
+                            cmd_result.to_display_string() +
+                            f"\n\n--- DIAGNOSTIC CONTEXT (Attempt {self.debug_attempts}/{self.max_debug_attempts}) ---\n" +
+                            diagnostic_ctx +
+                            "\n\nPlease analyze this failure, correct the code, and run the command again."
+                        )
+            else:
+                observation = self.tools.execute(tool_name, tool_args)
+
             self.log(f"[OBSERVATION]\n{observation}\n")
 
             # 4. Record step and update conversation history
