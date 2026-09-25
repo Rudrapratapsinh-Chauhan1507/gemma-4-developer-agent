@@ -45,15 +45,33 @@ class MiniSWEAgent:
         verbose: bool = True,
         retriever: Optional[Any] = None,
         enable_retrieval: bool = False,
+        enable_graph: bool = False,
     ):
         self.workspace_dir = workspace_dir
         self.retriever = retriever
-        self.tools = ToolRegistry(workspace_dir, retriever=retriever)
+        self.enable_retrieval = enable_retrieval or (retriever is not None)
+        self.enable_graph = enable_graph
+
+        # Lazy graph construction: only build when enable_graph=True
+        code_graph = None
+        if self.enable_graph:
+            try:
+                from .graph import CodeGraphBuilder
+                builder = CodeGraphBuilder(workspace_dir)
+                code_graph = builder.build()
+            except Exception as e:
+                code_graph = None
+                if verbose:
+                    try:
+                        print(f"[GRAPH] Warning: graph construction failed ({e}), graph tools disabled.")
+                    except UnicodeEncodeError:
+                        print("[GRAPH] Warning: graph construction failed, graph tools disabled.")
+
+        self.tools = ToolRegistry(workspace_dir, retriever=retriever, code_graph=code_graph)
         self.llm = llm_client or DeterministicSWEClient()
         self.system_prompt = system_prompt
         self.max_steps = max_steps
         self.verbose = verbose
-        self.enable_retrieval = enable_retrieval or (retriever is not None)
         if self.enable_retrieval:
             from .retrieval.context_builder import ContextBuilder
             self.context_builder = ContextBuilder()

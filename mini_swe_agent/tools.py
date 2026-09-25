@@ -9,6 +9,7 @@ Provides safe, sandboxed workspace operations:
 """
 
 import os
+import json
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -17,11 +18,12 @@ from typing import Dict, Any, List, Optional
 class ToolRegistry:
     """Manages execution of sandboxed developer tools within a workspace."""
 
-    def __init__(self, workspace_dir: str, retriever: Optional[Any] = None):
+    def __init__(self, workspace_dir: str, retriever: Optional[Any] = None, code_graph: Optional[Any] = None):
         self.workspace_dir = Path(workspace_dir).resolve()
         if not self.workspace_dir.exists():
             raise FileNotFoundError(f"Workspace directory does not exist: {self.workspace_dir}")
         self.retriever = retriever
+        self.code_graph = code_graph  # CodeGraph instance, or None if graph not enabled
 
     def _resolve_path(self, relative_path: str) -> Path:
         """Resolve a relative path inside the workspace and ensure it cannot escape."""
@@ -224,6 +226,84 @@ class ToolRegistry:
             )
         return "\n".join(lines)
 
+    def get_code_neighbors(self, node_id: str, direction: str = "both") -> str:
+        """
+        Return the immediate graph neighbors of a code node.
+
+        node_id:   A qualified node ID such as 'shop/cart.py::ShoppingCart::remove_item'
+        direction: 'incoming', 'outgoing', or 'both' (default)
+        """
+        if self.code_graph is None:
+            return "Code graph is not configured for this workspace."
+        try:
+            from .graph.graph_query import get_code_neighbors as _gcn
+            results = _gcn(self.code_graph, node_id, direction=direction)
+        except (ValueError, TypeError) as e:
+            return f"Error: {e}"
+        except Exception as e:
+            return f"Graph query failed: {e}"
+
+        if not results:
+            if not self.code_graph.graph.has_node(node_id):
+                return f"Node '{node_id}' not found in the code graph."
+            return f"Node '{node_id}' has no {direction} neighbors."
+
+        lines = [f"Neighbors of '{node_id}' (direction={direction}):"]
+        for r in results:
+            arrow = "->" if r["direction"] == "outgoing" else "<-"
+            lines.append(
+                f"  [{r['direction']}] {r['relationship']} {arrow} {r['neighbor_id']}"
+                f"  ({r['node_type']}, {r['file_path']}:{r['line']})"
+            )
+        return "\n".join(lines)
+
+    def get_code_subgraph(
+        self, node_id: str, max_depth: int = 2, direction: str = "both"
+    ) -> str:
+        """
+        Return a bounded multi-hop subgraph rooted at a code node.
+
+        node_id:   A qualified node ID such as 'shop/cart.py::ShoppingCart'
+        max_depth: How many hops to traverse (default 2)
+        direction: 'incoming', 'outgoing', or 'both' (default)
+        """
+        if self.code_graph is None:
+            return "Code graph is not configured for this workspace."
+        try:
+            from .graph.graph_query import get_code_subgraph as _gcs
+            result = _gcs(self.code_graph, node_id, max_depth=max_depth, direction=direction)
+        except (ValueError, TypeError) as e:
+            return f"Error: {e}"
+        except Exception as e:
+            return f"Graph subgraph query failed: {e}"
+
+        if result["root"] is None:
+            return f"Node '{node_id}' not found in the code graph."
+
+        root = result["root"]
+        nodes = result["nodes"]
+        edges = result["edges"]
+
+        lines = [
+            f"Subgraph rooted at '{node_id}' (max_depth={max_depth}, direction={direction}):",
+            f"  Root: {root['node_type']} `{root['symbol_name']}` at {root['file_path']}:{root['line']}",
+            f"  Discovered {len(nodes)} node(s), {len(edges)} edge(s).",
+        ]
+        if nodes:
+            lines.append("  Nodes:")
+            for n in nodes:
+                lines.append(
+                    f"    [depth {n['depth']}] {n['node_id']}"
+                    f"  ({n['node_type']}, {n['file_path']}:{n['line']})"
+                )
+        if edges:
+            lines.append("  Edges:")
+            for e in edges:
+                lines.append(
+                    f"    {e['source']} --[{e['relationship']}]--> {e['target']}"
+                )
+        return "\n".join(lines)
+
     def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
         """Dispatch a tool call by name with arguments."""
         tool_map = {
@@ -240,6 +320,15 @@ class ToolRegistry:
             "search_similar_code": lambda a: self.search_similar_code(
                 a.get("query", ""),
                 a.get("k", 5),
+            ),
+            "get_code_neighbors": lambda a: self.get_code_neighbors(
+                a.get("node_id", ""),
+                a.get("direction", "both"),
+            ),
+            "get_code_subgraph": lambda a: self.get_code_subgraph(
+                a.get("node_id", ""),
+                a.get("max_depth", 2),
+                a.get("direction", "both"),
             ),
             "edit_file": lambda a: self.edit_file(
                 a.get("path", ""),
