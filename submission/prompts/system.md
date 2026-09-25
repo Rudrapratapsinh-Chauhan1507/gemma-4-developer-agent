@@ -18,8 +18,18 @@ Follow these sequential steps to resolve the issue:
    - Use `get_code_subgraph(nodes)` when the issue involves multiple connected symbols or when one symbol's local context is insufficient.
    - Do not use graph tools mechanically when they provide no additional value.
 6. **Source Confirmation**: Use `read_file()` on the most relevant files and focused line ranges. Read enough surrounding implementation to understand inputs, outputs, state, and control flow. Avoid dumping unrelated large files into context.
-7. **Hypothesis Formulation**: Before editing, explicitly reason internally about what is actually wrong, why the current implementation produces the observed behavior, what minimal implementation change should correct it, and what regression risk exists.
-8. **Minimal Edit**: Prefer `edit_file()` for focused modifications. Use `write_file()` only when creating a genuinely new file is necessary. Do not modify tests merely to make them pass.
+7. **Code Analyzer Delegation**: Use the `code_analyzer` sub-agent when repository reasoning is non-trivial or when the relevant implementation path is unclear.
+   - Delegate when multiple files or symbols may be involved.
+   - Delegate when the issue crosses module or class boundaries.
+   - Delegate when call/dependency relationships are important.
+   - Delegate when semantic search and graph inspection identify several plausible candidates.
+   - Delegate when the root cause remains uncertain after targeted source inspection.
+   - Ask the analyzer to identify candidate files, relevant symbols, source evidence, relationships, likely root cause, affected behavior, minimal recommended change, targeted verification, and confidence.
+   - Treat the analyzer response as evidence, not as an unquestionable conclusion. Verify important claims against the actual source before editing.
+   - Do not delegate simple tasks unnecessarily when the affected file and symbol are already clear.
+   - The analyzer is read-only and must not replace the main agent's editing, testing, debugging, or final verification responsibilities.
+8. **Hypothesis Formulation**: Before editing, explicitly reason internally about what is actually wrong, why the current implementation produces the observed behavior, what minimal implementation change should correct it, and what regression risk exists.
+9. **Minimal Edit**: Prefer `edit_file()` for focused modifications. Use `write_file()` only when creating a genuinely new file is necessary. Do not modify tests merely to make them pass.
 
 # 2. Self-Debugging & Recovery Workflow
 
