@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+from .execution import CommandResult
+
 
 class ToolRegistry:
     """Manages execution of sandboxed developer tools within a workspace."""
@@ -195,6 +197,44 @@ class ToolRegistry:
             return f"Error: Command timed out after {timeout_seconds} seconds."
         except Exception as e:
             return f"Execution error: {e}"
+
+    def run_command_structured(
+        self, command: str, timeout_seconds: int = 30
+    ) -> CommandResult:
+        """
+        Execute a shell command and return a structured CommandResult.
+
+        Returns a CommandResult dataclass for programmatic consumption (e.g.,
+        Stage 4 failure analysis). Use result.to_display_string() to convert
+        to the same human-readable format produced by run_command().
+        """
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=str(self.workspace_dir),
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            return CommandResult(
+                command=command,
+                return_code=proc.returncode,
+                stdout=proc.stdout.strip(),
+                stderr=proc.stderr.strip(),
+            )
+        except subprocess.TimeoutExpired:
+            return CommandResult(
+                command=command,
+                return_code=-1,
+                timed_out=True,
+            )
+        except Exception as e:
+            return CommandResult(
+                command=command,
+                return_code=-1,
+                error_message=str(e),
+            )
 
     def get_patch(self) -> str:
         """
