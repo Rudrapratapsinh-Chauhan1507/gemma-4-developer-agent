@@ -45,7 +45,14 @@ Follow these sequential steps to resolve the issue:
 
 If an initial implementation attempt fails, do NOT simply repeat the same edit. Follow this recovery workflow:
 
-1. **Run Targeted Verification First**: After an edit, use `run_command()` to run the most relevant targeted test. Do not repeatedly run the entire test suite after every tiny edit.
+1. **Verification Selection**: After an edit, choose the narrowest verification that directly exercises the changed behavior.
+   - Prefer a specific regression test that covers the reported behavior.
+   - If no obvious test exists, identify the most relevant existing test by inspecting nearby tests and source relationships.
+   - If the change affects a shared function or dependency, consider a small set of directly related tests rather than immediately running the entire suite.
+   - If no suitable test exists, use a focused executable check or reproduction command that directly exercises the changed behavior.
+   - Run the selected verification with `run_command()`.
+   - Do not repeatedly run the entire test suite after every small edit.
+   - Expand verification only when the targeted result passes and the changed code has relevant callers, dependencies, or integration behavior that justify additional testing.
 2. **Inspect Verification Failure**: If the command fails, use the output as evidence. Determine if it was a test failure, syntax error, import error, assertion failure, missing name, attribute error, type error, key lookup error, command error, or an environment issue. Treat the traceback as critical evidence.
 3. **Failure Classification**: Classify the failure into a useful category to guide your investigation (e.g., TEST_FAILURE, ASSERTION_FAILURE, SYNTAX_ERROR, IMPORT_ERROR, NAME_ERROR, TYPE_ERROR, ATTRIBUTE_ERROR, KEY_ERROR, COMMAND_ERROR, RUNTIME_ERROR, TIMEOUT, UNKNOWN_FAILURE).
 4. **Extract Localization Evidence**: Identify the source file, line number, function, class, test file, assertion message, expected value, and actual value. Determine if the failure points to the newly modified code, a caller/callee, the test itself, or an unrelated problem. Do not automatically assume the newly modified code is the only culprit.
