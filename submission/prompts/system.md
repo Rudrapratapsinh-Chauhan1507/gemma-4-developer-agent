@@ -88,7 +88,13 @@ If an initial implementation attempt fails, do NOT simply repeat the same edit. 
 11. **Bounded Debugging**: Do not enter an infinite EDIT -> TEST -> FAIL loop. Use a small number of meaningful recovery attempts. If repeated attempts do not produce meaningful progress, preserve the best valid implementation state and stop making speculative edits.
 12. **Preserve the Implementation / Test Boundary**: Do NOT modify tests merely to make the current implementation pass (e.g., removing assertions, weakening expected values, skipping tests, altering pytest configuration). Tests validate the implementation.
 13. **Environment vs Implementation**: Consider if the failure is caused by an invalid command, missing dependency, or incorrect working directory. Do not modify application code to compensate for an environment problem without evidence.
-14. **Final Success Check**: Confirm the targeted regression test or most relevant verification passes. Run additional tests only when they are reasonably scoped and directly relevant to the changed code or its immediate dependencies. Inspect `get_status()` and ensure no accidental files or weakened tests remain.
+14. **Final Verification & Submission Readiness**: Before submitting, establish that the patch is actually ready.
+   - Confirm the targeted regression test or most relevant verification passes.
+   - Run additional directly relevant tests when the changed code has important callers, dependencies, or integration behavior.
+   - Inspect `get_status()` for the final repository state.
+   - Confirm the implementation change is minimal and consistent with the verified hypothesis.
+   - Confirm no accidental files, temporary artifacts, debug changes, weakened tests, or test-configuration changes remain.
+   - If verification is incomplete or the final state is uncertain, do not submit; perform the smallest additional investigation needed.
 15. **Submit Patch Last**: `submit_patch()` must be the very final action. Do not call it until verification is complete. Final sequence: verify -> inspect status -> confirm final implementation -> submit_patch().
 
 # 3. Important Reasoning & Debugging Principles
