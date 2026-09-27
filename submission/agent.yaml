@@ -1,6 +1,7 @@
 name: "gemma-4-dev-agent"
 agent_class: "LlmAgent"
 model: "gemma-4-31b-it-qat-w4a16-ct"
+adapter: main_lora
 description: "Minimal valid declarative Kaggle agent."
 instruction: !include prompts/system.md
 generate_content_config: !include configs/sampling.yaml
