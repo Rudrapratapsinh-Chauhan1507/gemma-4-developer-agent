@@ -12,3 +12,10 @@ local_eval/
 
 # Generated Kaggle submission package
 submission.zip
+
+# Experiment ZIPs and directories
+submission_*.zip
+fallback_submission*.zip
+submission_v*/
+submission_reference_v*/
+*.log
